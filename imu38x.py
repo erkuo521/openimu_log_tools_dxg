@@ -1,5 +1,4 @@
 import os
-import time
 import sys
 import math
 import serial
@@ -21,7 +20,9 @@ packet_def = {'A1': [39, bytearray.fromhex('4131')],\
               'a2': [55, bytearray.fromhex('6132')],\
               'e1': [82, bytearray.fromhex('6531')],\
               'e2': [130, bytearray.fromhex('6532')],\
-              'id': [154, bytearray.fromhex('6964')]}
+              'id': [154, bytearray.fromhex('6964')],\
+              'sd': [57, bytearray.fromhex('7364')],\
+              'FM': [123, bytearray.fromhex('464D')]}
 
 class imu38x:
     def __init__(self, port, baud=115200, packet_type='A2', pipe=None):
@@ -83,7 +84,8 @@ class imu38x:
             #close port or file
             self.ser.close()
             print('End of processing.')
-            self.pipe.send('exit')
+            if self.pipe is not None:
+                self.pipe.send('exit')
 
     def parse_new_data(self, data):
         '''
@@ -122,8 +124,7 @@ class imu38x:
                     self.nbf = self.sync_packet(self.bf, self.nbf, preamble)
 
     def get_latest(self):
-        a = self.latest
-        return a
+        return self.latest
 
     def parse_packet(self, payload):
         '''
@@ -296,7 +297,7 @@ class imu38x:
     
         # Counter Value
         itow = 16777216 * payload[26] + 65536 * payload[27] + 256 * payload[28] + payload[29]   
-    
+
         # BIT Value
         bit = 256 * payload[30] + payload[31]
             
@@ -640,8 +641,84 @@ class imu38x:
         steering_states = payload[8:10]
         print(['SA', steering_states])
         # reserved
-
         return counter, steering_angle, steering_angle_rate, steering_states
+
+    def parse_sd(self, payload):
+        '''
+        parse sd packet.
+        The payload length (NumOfBytes) is based on the following:
+            // 1 uint32_t   (4 bytes)   =   4 bytes     timer
+            // 3 floats     (4 bytes)   =   12 bytes    master gyro
+            // 3 floats     (4 bytes)   =   12 bytes    master accel
+            // 3 floats     (4 bytes)   =   12 bytes    slave gyro
+            // 1 float      (4 byte)    =   4 byte      GNSS raw ground speed
+            // 1 uint8_t    (1 byte)    =   1 byte      GNSS update flag
+            // 1 uint8_t    (1 byte)    =   1 byte      GNSS fix type
+            // 1 uint32_t   (4 byte)    =   4 byte      GNSS TOW
+            // =================================
+            //              NumOfBytes  =  54 bytes
+        '''
+        fmt = '=I'          # timer
+        fmt += 'fff'        # master gyro
+        fmt += 'fff'        # master accel
+        fmt += 'fff'        # slave gyro
+        fmt += 'f'          # ground speed
+        fmt += 'b'          # GNSS update flag
+        fmt += 'b'          # GNSS fix type
+        fmt += 'I'          # GNSS TOW
+
+        data = struct.unpack(fmt, payload)
+        timer = data[0]
+        w_master = data[1:4]
+        a_master = data[4:7]
+        w_slave = data[7:10]
+        ground_speed = data[10]
+        update_flag = data[11]
+        fix_type = data[12]
+        gps_itow = data[13]
+        # print([timer, gps_itow, w_master, a_master, w_slave, ground_speed, update_flag, fix_type])
+        return timer, gps_itow, w_master, a_master, w_slave, ground_speed, update_flag, fix_type
+
+    def parse_FM(self, payload):
+        '''
+        Byte Offset 	Name 	Format 	Notes 	Scaling 	unit 	Description 
+        0 	xAccelCounts1 	I4 	- 	counts 	Ux accelerometer (Chip#= sensorSubset *4)
+        4 	yAccelCounts1 	I4 	- 	counts 	Uy accelerometer (Chip#= sensorSubset *4)
+        8 	zAccelCounts1 	I4 	- 	counts 	Uz accelerometer (Chip#= sensorSubset *4)
+        12 	xRateCounts1 	I4 	- 	counts 	Ux angular rate (Chip#= sensorSubset *4)
+        16 	yRateCounts1 	I4 	- 	counts 	Uy angular rate (Chip#= sensorSubset *4)
+        20 	zRateCounts1 	I4 	- 	counts 	Uz angular rate (Chip#= sensorSubset *4)
+        24 	TempCounts1	    I4 	- 	counts 	Temperature  (Chip#= sensorSubset *4)
+        28 	xAccelCounts2 	I4 	- 	counts 	Ux accelerometer  (Chip#= sensorSubset *4+1)
+        32	yAccelCounts2 	I4 	- 	counts 	Uy accelerometer  (Chip#= sensorSubset *4+1)
+        36	zAccelCounts2 	I4 	- 	counts 	Uz accelerometer  (Chip#= sensorSubset *4+1)
+        40 	xRateCounts2	I4 	- 	counts 	Ux angular rate  (Chip#= sensorSubset *4+1)
+        44 	yRateCounts2 	I4 	- 	counts 	Uy angular rate  (Chip#= sensorSubset *4+1)
+        48 	zRateCounts2 	I4 	- 	counts 	Uz angular rate  (Chip#= sensorSubset *4+1)
+        52 	TempCounts2	    I4 	- 	counts 	Temperature  (Chip#= sensorSubset *4+1)
+        56	xAccelCounts3 	I4 	- 	counts 	Ux accelerometer  (Chip#= sensorSubset *4+2)
+        60	yAccelCounts3 	I4 	- 	counts 	Uy accelerometer  (Chip#= sensorSubset *4+2)
+        64	zAccelCounts3 	I4 	- 	counts 	Uz accelerometer  (Chip#= sensorSubset *4+2)
+        68 	xRateCounts3 	I4 	- 	counts 	Ux angular rate  (Chip#= sensorSubset *4+2)
+        72 	yRateCounts3 	I4 	- 	counts 	Uy angular rate  (Chip#= sensorSubset *4+2)
+        76 	zRateCounts3 	I4 	- 	counts 	Uz angular rate  (Chip#= sensorSubset *4+2)
+        80 	TempCounts3	    I4 	- 	counts 	Temperature  (Chip#= sensorSubset *4+2)
+        84	xAccelCounts4 	I4 	- 	counts 	Ux accelerometer  (Chip#= sensorSubset *4+3)
+        88	yAccelCounts4 	I4 	- 	counts 	Uy accelerometer  (Chip#= sensorSubset *4+3)
+        92	zAccelCounts4 	I4 	- 	counts 	Uz accelerometer  (Chip#= sensorSubset *4+3)
+        96	xRateCounts4 	I4 	- 	counts 	Ux angular rate  (Chip#= sensorSubset *4+3)
+        100 yRateCounts4 	I4 	- 	counts 	Uy angular rate  (Chip#= sensorSubset *4+3)
+        104	zRateCounts4 	I4 	- 	counts 	Uz angular rate  (Chip#= sensorSubset *4+3)
+        108	TempCounts4	    I4 	- 	counts 	Temperature  (Chip#= sensorSubset *4+3)
+        112 sensorSubset 	U2 	- 	number	Multiply by 4 to get first sensor chip number in the packet 
+        114	sampleIdx 	    U2 	- 	number	Sample idx. Packets with the same sample idx present sensors data taken at the same moment of time. 
+        '''
+        fmt = '>i'*28   # four chips, 7 (3 accel, 3 gyo and 1 temp) for each
+        fmt += '>H'*2
+        data = struct.unpack(fmt, payload)
+        print(data[-1])
+        # reserved
+        return data
 
     def sync_packet(self, bf, bf_len, preamble):
         idx = -1
