@@ -21,10 +21,11 @@ packet_def = {'A1': [39, bytearray.fromhex('4131')],\
               'a2': [55, bytearray.fromhex('6132')],\
               'e1': [82, bytearray.fromhex('6531')],\
               'e2': [130, bytearray.fromhex('6532')],\
-              'id': [154, bytearray.fromhex('6964')]}
+              'id': [154, bytearray.fromhex('6964')],\
+              'sT': [38, bytearray.fromhex('7354')]}
 
 class imu38x:
-    def __init__(self, port, baud=115200, packet_type='A2', pipe=None):
+    def __init__(self, port, baud=115200, packet_type='sT', pipe=None):
         '''
         Initialize and then start ports search and autobaud process
         If baud <= 0, then port is actually a data file.
@@ -103,7 +104,7 @@ class imu38x:
                     if packet_crc == calculated_crc:
                         self.latest = self.parse_packet(self.bf[2:self.bf[4]+5])
                         if self.latest[0]%5 == 0:
-                            print(self.latest[-3]) 
+                            print(self.latest) 
                         if self.pipe is not None:
                             self.pipe.send(self.latest)
                         # remove decoded data from the buffer
@@ -688,10 +689,10 @@ class imu38x:
 
 if __name__ == "__main__":
     # default settings
-    port = 'COM7'
-    baud = 230400
+    port = 'COM3'
+    baud = 115200
     
-    packet_type = 'SH'
+    packet_type = 'sT'
     # get settings from CLI
     num_of_args = len(sys.argv)
     if num_of_args > 1:
