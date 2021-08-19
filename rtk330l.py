@@ -11,7 +11,7 @@ packet_def = {'s1': [43, bytearray.fromhex('7331')],\
               'sT': [38, bytearray.fromhex('7354')]}
 
 class rtk330l:
-    def __init__(self, port, baud=115200, packet_type='sT', pipe=None):
+    def __init__(self, port, baud=115200, packet_type='s1', pipe=None):
         self.port = port
         self.baud = baud
         self.physical_port = True
@@ -202,7 +202,7 @@ class rtk330l:
 if __name__ == "__main__":
     port = 'COM3'
     baud = 115200
-    packet_type = 'sT'
+    packet_type = 's1'
 
     num_of_args = len(sys.argv)
     if num_of_args > 1:
