@@ -8,7 +8,6 @@ import struct
 
 preamble = bytearray.fromhex('5555')
 packet_def = {'s1': [43, bytearray.fromhex('7331')],\
-              'iN': [38, bytearray.fromhex('694E')],\
               'sT': [38, bytearray.fromhex('7354')]}
 
 class rtk330l:
