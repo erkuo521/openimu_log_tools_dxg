@@ -121,11 +121,13 @@ class rtk330l:
         for i in range(3):
             accels_float = (math.pow(4, 12) * payload[4*i+12] + math.pow(4, 8) * payload[4*i+13] + \
             math.pow(4, 4) * payload[4*i+14] + payload[4*i+15])
+            accels[i] = accels_float
         
         angles = [0 for x in range(3)]
         for i in range(3):
             angles_float = accels_float = (math.pow(4, 12) * payload[4*i+16] + math.pow(4, 8) * payload[4*i+17] + \
             math.pow(4, 4) * payload[4*i+18] + payload[4*i+19])
+            angles[i] = angles_float
 
         return gps_week, time_of_week, accels, angles
        
