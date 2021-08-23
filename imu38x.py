@@ -18,6 +18,7 @@ packet_def = {'A1': [39, bytearray.fromhex('4131')],\
               'MG': [35, bytearray.fromhex('4D47')],\
               'z1': [47, bytearray.fromhex('7a31')],\
               's1': [59, bytearray.fromhex('7331')],\
+              'a1': [54, bytearray.fromhex('6131')],\
               'a2': [55, bytearray.fromhex('6132')],\
               'e1': [82, bytearray.fromhex('6531')],\
               'e2': [130, bytearray.fromhex('6532')],\
@@ -106,7 +107,7 @@ class imu38x:
                     if packet_crc == calculated_crc:
                         self.latest = self.parse_packet(self.bf[2:self.bf[4]+5])
                         if self.latest[0]%5 == 0:
-                            print(self.latest[-3]) 
+                            print(self.latest) 
                         if self.pipe is not None:
                             self.pipe.send(self.latest)
                         # remove decoded data from the buffer
@@ -448,27 +449,48 @@ class imu38x:
                 =================================
                           NumOfBytes =  75 bytes
         '''
-        fmt = '=I'          # timer
-        fmt += 'd'          # time double
-        fmt += 'fff'        # Euler angles
-        fmt += 'fff'        # accel
-        fmt += 'fff'        # gyro
-        fmt += 'fff'        # gyro bias
-        fmt += 'fff'        # mag
-        fmt += 'B'          # opMode
-        fmt += 'B'          # linAccelSw
-        fmt += 'B'          # turnSw
-        data = struct.unpack(fmt, payload)
-        timer = data[0]
-        euler = data[2:5]
-        acc = data[5:8]
-        gyro = data[8:11]
-        gyro_bias = data[11:14]
-        mag = data[14:17]
-        op_mode = data[17]
-        lin_accel_sw = data[18]
-        turn_sw = data[19]
-        return timer, euler, gyro, acc, turn_sw, lin_accel_sw
+        timer = (math.pow(4, 12) * payload[0] + math.pow(4, 8) * payload[1] + \
+            math.pow(4, 4) * payload[2] + payload[3])
+        
+        euler = (math.pow(4, 28) * payload[4] + math.pow(4, 24) * payload[5] + \
+            math.pow(4, 20) * payload[6] + math.pow(4, 16) * payload[7] + math.pow(4, 12) * \
+            payload[8] + math.pow(4, 8) * payload[9] + math.pow(4, 4) * payload[10] + \
+            payload[11])
+
+        roll = (math.pow(4, 12) * payload[12] + math.pow(4, 8) * payload[13] + \
+            math.pow(4,4) * payload[14] + payload[15])
+
+        pitch = (math.pow(4,12) * payload[16] + math.pow(4,8) * payload[17] + \
+            math.pow(4, 4) * payload[18] + payload[19])
+
+        yaw = (math.pow(4, 12) * payload[20] + math.pow(4, 8) * payload[21] + \
+            math.pow(4, 4) * payload[22] + payload[23])
+
+        accels = [0 for x in range(3)]
+        for i in range(3):
+            accels_float = (math.pow(4, 12) * payload[4*i+24] + math.pow(4, 8) * payload[4*i+25] + \
+                math.pow(4, 4) * payload[4*i+26] + payload[4*i+27])
+            accels[i] = accels_float
+
+        gyros = [0 for x in range(3)]
+        for i in range(3):
+            gyros_float = (math.pow(4, 12) * payload[4*i+36] + math.pow(4, 8) * payload[4*i+37] + \
+                math.pow(4, 4) * payload[4*i+38] + payload[4*i+39])
+            gyros[i] = gyros_float
+
+        gyro_bias = [0 for x in range(3)]
+        for i in range(3):
+            gyros_bias_float = (math.pow(4, 12) * payload[4*i+48] + math.pow(4, 8) * payload[4*i+49] + \
+                math.pow(4, 4) * payload[4*i+50] + payload[4*i+51])
+            gyro_bias[i] = gyros_bias_float
+
+        mags = [0 for x in range(3)]
+        for i in range(3):
+            mags_float = (math.pow(4, 12) * payload[4*i+60] + math.pow(4, 8) * payload[4*i+61] + \
+                math.pow(4, 4) * payload[4*i+62] + payload[4*i+63])
+            mags[i] = mags_float
+
+        return timer, euler, roll, pitch, yaw, accels, gyros, gyro_bias, mags
 
     def parse_e2(self, payload):
         '''
@@ -518,6 +540,37 @@ class imu38x:
         turn_sw = data[28]
         return timer, 0, acc, gyro, lla, velocity, euler,\
             (0,0,0), (0,0,0), 0, acc_bias, turn_sw, lin_accel_sw
+
+    def parse_a1(self, payload):
+        timeITOW = (math.pow(4, 12) * payload[0] + math.pow(4, 8) * payload[1] + \
+            math.pow(4, 4) * payload[2] + payload[3])
+
+        time = (math.pow(4, 28) * payload[4] + math.pow(4, 24) * payload[5] + \
+            math.pow(4, 20) * payload[6] + math.pow(4, 16) * payload[7] + math.pow(4, 12) * \
+            payload[8] + math.pow(4, 8) * payload[9] + math.pow(4, 4) * payload[10] + \
+            payload[11])
+
+        roll = (math.pow(4, 12) * payload[12] + math.pow(4, 8) * payload[13] + \
+            math.pow(4,4) * payload[14] + payload[15])
+
+        pitch = (math.pow(4,12) * payload[16] + math.pow(4,8) * payload[17] + \
+            math.pow(4, 4) * payload[18] + payload[19])
+
+        corrected_gyros = [0 for x in range(3)]
+        for i in range(3):
+            corrected_gyros[i] = (math.pow(4, 12) * payload[4*i+20] + math.pow(4, 8) * payload[4*i+21] + \
+                math.pow(4, 4) * payload[4*i+22] + payload[4*i+23])
+
+        accels = [0 for x in range(3)]
+        for i in range(3):
+            accels[i] = (math.pow(4, 12) * payload[4*i+32] + math.pow(4, 8) * payload[4*i+33] + \
+                math.pow(4, 4) * payload[4*i+34] + payload[4*i+35])
+
+        op_mode = payload[44]
+        linear_accel_sw = payload[45]
+        turn_sw = payload[46]
+
+        return timeITOW, time, roll, pitch, corrected_gyros, accels, op_mode, linear_accel_sw, turn_sw
 
     def parse_a2(self, payload):
         #   1 uint32_t (4 bytes) = 4 bytes,     itow
@@ -766,10 +819,10 @@ class imu38x:
 
 if __name__ == "__main__":
     # default settings
-    port = 'COM7'
-    baud = 230400
+    port = False
+    baud = 0
     
-    packet_type = 'SH'
+    packet_type = 'a1'
     # get settings from CLI
     num_of_args = len(sys.argv)
     if num_of_args > 1:

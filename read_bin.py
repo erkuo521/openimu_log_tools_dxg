@@ -1,6 +1,6 @@
 import sys
 
-filepath = r'user.bin'
+filepath = r'2021-0820-1755-com.txt'
 binfile = open(filepath, 'rb')
 i=0
 ch = binfile.read(1)
